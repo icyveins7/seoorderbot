@@ -148,7 +148,6 @@ class OrderBot:
                 ordertext = ordertext + s + '\n'
             context.bot.send_message(chat_id=update.message.chat_id, text=ordertext, parse_mode='HTML')
             ownertext = '<i><b>Orders with Names</b></i> ☕️🥤\n'+''.join([item + ': ' +','.join(str(n) for n in self.owner[item])+'\n' for item in self.owner])
-            print(ownertext)
             context.bot.send_message(chat_id=update.message.chat_id, text=ownertext, parse_mode='HTML')
             # reset orders
             self.orders = []

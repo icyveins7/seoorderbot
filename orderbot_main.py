@@ -1,5 +1,5 @@
 from telegram.ext import Updater, CommandHandler, MessageHandler, MessageFilter, Filters, CallbackQueryHandler, CallbackContext
-from telegram import KeyboardButton, ReplyKeyboardMarkup
+from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 import datetime as dt
 import re
@@ -19,6 +19,7 @@ class OrderBot:
     def __init__(self, API_TOKEN=None):
         if API_TOKEN is None:
             self.API_TOKEN = os.environ['ORDERBOTTOKEN']
+                
         else:
             self.API_TOKEN = API_TOKEN
             
@@ -32,6 +33,7 @@ class OrderBot:
                      'Teh': {'Normal', 'Siew Dai', 'Gau', 'Gah Dai', 'Po'}, 
                      'Teh-O': {'Normal', 'Siew Dai', 'Gau', 'Kosong', 'Po', 'Kosong Di Lo'},
                      'Teh-C': {'Normal', 'Siew Dai', 'Gau', 'Gah Dai', 'Po'},
+                     'Milo': {'Normal','Gau','Gah Dai','Dinosaur'},
                      'Canned': {'Coke', 'Pepsi'}}
         self.unpackedMenu = []
         for i in self.menu.keys():
@@ -57,6 +59,7 @@ class OrderBot:
         
         # containers
         self.orders = []
+        self.owner = {}
         
     
         
@@ -85,7 +88,8 @@ class OrderBot:
             
             # context.bot.send_message(chat_id=update.message.chat_id, text='Please begin orders by typing "O".',
             #                          reply_markup=kb_markup)
-            context.bot.send_message(chat_id=update.message.chat_id, text='Please begin orders by typing "Order".')
+            context.bot.send_message(chat_id=update.message.chat_id, text='Please begin orders by typing "Order".',
+                                    reply_markup=ReplyKeyboardRemove())
             
         else:
             context.bot.send_message(chat_id=update.message.chat_id, text='Ongoing order; type "Order" to order.')
@@ -121,8 +125,15 @@ class OrderBot:
             
             # completion stage
             elif re.search('[+]', update.message.text):
-                print("%s finished order: %s" % (update.message.from_user.first_name, update.message.text))
+                # print("%s finished order: %s" % (update.message.from_user.first_name, update.message.text))
                 self.orders.append(update.message.text)
+                item = update.message.text
+                name = update.message.from_user.first_name
+                self.owner[item]=[name] if item not in self.owner else self.owner[item]+[name]
+                context.bot.send_message(chat_id=update.message.chat_id, 
+                                    text=update.message.from_user.first_name + " ordered " + update.message.text, 
+                                     reply_markup=ReplyKeyboardRemove(selective=True))
+                
     
     def closeOrder(self, update, context):
         if self.nowOrdering is True:
@@ -130,17 +141,24 @@ class OrderBot:
             context.bot.send_message(chat_id=update.message.chat_id, text='Orders closed.')
             # deliver the order list
             uniqueItems = np.unique(self.orders)
-            ordertext = ''
+            ordertext = '<i><b>Orders</b></i> Simplified☕️🥤\n'
             for i in np.arange(uniqueItems.size):
                 cnt = self.orders.count(uniqueItems[i])
                 s = '%s   x%d' % (uniqueItems[i], cnt)
                 ordertext = ordertext + s + '\n'
-            context.bot.send_message(chat_id=update.message.chat_id, text=ordertext)
-            
+            context.bot.send_message(chat_id=update.message.chat_id, text=ordertext, parse_mode='HTML')
+            ownertext = '<i><b>Orders with Names</b></i> ☕️🥤\n'+''.join([item + ': ' +','.join(str(n) for n in self.owner[item])+'\n' for item in self.owner])
+            context.bot.send_message(chat_id=update.message.chat_id, text=ownertext, parse_mode='HTML')
             # reset orders
             self.orders = []
+            self.owner = {}
 
         
 if __name__ == '__main__':
-    bot = OrderBot()
+    try:
+        with open("token.txt") as f:
+            TOKEN = f.read()
+        bot = OrderBot(TOKEN)
+    except:
+        bot = OrderBot()
     bot.run()

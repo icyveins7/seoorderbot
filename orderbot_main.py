@@ -34,7 +34,10 @@ class OrderBot:
                      'Teh-O': {'Normal', 'Siew Dai', 'Gau', 'Kosong', 'Po', 'Kosong Di Lo'},
                      'Teh-C': {'Normal', 'Siew Dai', 'Gau', 'Gah Dai', 'Po'},
                      'Milo': {'Normal','Gau','Gah Dai','Dinosaur'},
-                     'Canned': {'Coke', 'Pepsi'}}
+                     'Homemade Lemon Tea': {'Normal'},
+                     'Bandung': {'Normal'},
+                     'Can/Packet': {'Coke', 'Pepsi', 'Soya Bean Milk', 'Almond Milk', 'Lemon Tea', 'Chrysanthemum Tea'}}
+                     
         self.unpackedMenu = []
         for i in self.menu.keys():
             for j in self.menu[i]:

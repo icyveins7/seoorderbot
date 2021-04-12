@@ -65,6 +65,8 @@ class OrderBot:
         
     def run(self):
         self.dispatcher.add_handler(CommandHandler('status', self.check))
+        self.dispatcher.add_handler(CommandHandler('update', self.updateBot))
+        
         self.dispatcher.add_handler(MessageHandler(Filters.regex(r'Drinks?'), self.openOrder))
         self.dispatcher.add_handler(MessageHandler(Filters.regex(r'Order'), self.addToOrder))
         self.dispatcher.add_handler(MessageHandler(Filters.regex(r'Done'), self.closeOrder))
@@ -77,6 +79,9 @@ class OrderBot:
 
     def check(self, update, context):
         status(update, context)
+        
+    def updateBot(self, update, context):
+        pullUpdate(update, context)
 
     def openOrder(self, update, context):
         if update.message.chat_id not in self.sessions: self.sessions[update.message.chat_id] = Session(update.message.chat_id) 

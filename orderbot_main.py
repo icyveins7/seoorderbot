@@ -56,13 +56,10 @@ class OrderBot:
         # print(self.filtMenuFine)
         
         
+
         
-        # define states
-        self.nowOrdering = False
-        
-        # containers
-        self.orders = []
-        self.owner = {}
+        # dict of unique sessions tied to unique chats
+        self.sessions = {}
         
     
         
@@ -82,8 +79,9 @@ class OrderBot:
         status(update, context)
 
     def openOrder(self, update, context):
-        if self.nowOrdering is False:
-            self.nowOrdering = True
+        if update.message.chat_id not in self.sessions: self.sessions[update.message.chat_id] = Session(update.message.chat_id) 
+        if self.sessions[update.message.chat_id].nowOrdering is False:
+            self.sessions[update.message.chat_id].nowOrdering = True
             
             # kb = [[InlineKeyboardButton(i, callback_data=i)] for i in list(self.menu.keys())]
             
@@ -98,7 +96,7 @@ class OrderBot:
             context.bot.send_message(chat_id=update.message.chat_id, text='Ongoing order; type "Order" to order.')
     
     def addToOrder(self, update, context):
-        if self.nowOrdering is True:
+        if update.message.chat_id in self.sessions and self.sessions[update.message.chat_id].nowOrdering is True: # we can do this since 'and' is a short-circuit operator
             kb = [[KeyboardButton(i)] for i in list(self.menu.keys())]
             name = update.message.from_user.first_name
             context.bot.send_message(chat_id=update.message.chat_id, text=name + ' is adding an item..', 
@@ -106,7 +104,7 @@ class OrderBot:
                                      reply_markup=ReplyKeyboardMarkup(kb, one_time_keyboard=True, selective=True))
     
     def editOrder(self, update, context):
-        if self.nowOrdering is True:
+        if update.message.chat_id in self.sessions and self.sessions[update.message.chat_id].nowOrdering is True:
             # coarse -> fine stage
             if update.message.text in self.menu.keys():
                 item = update.message.text
@@ -129,34 +127,39 @@ class OrderBot:
             # completion stage
             elif re.search('[+]', update.message.text):
                 # print("%s finished order: %s" % (update.message.from_user.first_name, update.message.text))
-                self.orders.append(update.message.text)
+                uid = update.message.chat_id
                 item = update.message.text
                 name = update.message.from_user.first_name
-                self.owner[item]=[name] if item not in self.owner else self.owner[item]+[name]
-                context.bot.send_message(chat_id=update.message.chat_id, 
-                                    text=update.message.from_user.first_name + " ordered " + update.message.text, 
+                self.sessions[uid].orders.append(item)
+                self.sessions[uid].owner[item]=[name] if item not in self.sessions[uid].owner else self.sessions[uid].owner[item]+[name]
+                context.bot.send_message(chat_id=uid, 
+                                     text=name + " ordered " + item, 
                                      reply_markup=ReplyKeyboardRemove(selective=True))
                 
     
     def closeOrder(self, update, context):
-        if self.nowOrdering is True:
-            self.nowOrdering = False
+        if update.message.chat_id in self.sessions and self.sessions[update.message.chat_id].nowOrdering is True:
+            self.sessions[update.message.chat_id].nowOrdering = False
             context.bot.send_message(chat_id=update.message.chat_id, text='Orders closed.')
             # deliver the order list
-            uniqueItems = np.unique(self.orders)
-            ordertext = '<i><b>Orders</b></i> Simplified☕️🥤\n'
-            for i in np.arange(uniqueItems.size):
-                cnt = self.orders.count(uniqueItems[i])
-                s = '%s   x%d' % (uniqueItems[i], cnt)
-                ordertext = ordertext + s + '\n'
+            orders = self.sessions[update.message.chat_id].orders
+            owner = self.sessions[update.message.chat_id].owner
+            ordertext = '<i><b>Orders Simplified</b></i> ☕️🥤\n' + ''.join(['%s x%d\n'%(item,orders.count(item)) for item in set(orders)])
             context.bot.send_message(chat_id=update.message.chat_id, text=ordertext, parse_mode='HTML')
-            ownertext = '<i><b>Orders with Names</b></i> ☕️🥤\n'+''.join([item + ': ' +','.join(str(n) for n in self.owner[item])+'\n' for item in self.owner])
+            ownertext = '<i><b>Orders with Names</b></i> ☕️🥤\n'+ ''.join([item + ': ' +', '.join(str(n) for n in owner[item])+'\n' for item in owner])
             context.bot.send_message(chat_id=update.message.chat_id, text=ownertext, parse_mode='HTML')
             # reset orders
-            self.orders = []
-            self.owner = {}
+            self.sessions[update.message.chat_id].orders = []
+            self.sessions[update.message.chat_id].owner = {}
 
-        
+class Session:
+    def __init__(self,chat_id):
+        self.orders = [] # Orders
+        self.owner = {} # Owners
+        self.chat_id = chat_id # Unique chat id
+        self.nowOrdering = False # ordering status
+        print('Session created for chat ',chat_id)
+
 if __name__ == '__main__':
     try:
         with open("token.txt") as f:

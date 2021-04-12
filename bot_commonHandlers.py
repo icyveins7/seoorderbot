@@ -112,5 +112,7 @@ def downloader(update, context):
     context.bot.send_message(chat_id=update.message.chat_id,
                          text='Downloaded file ' + origName)
 
-
+#%% Automatic git updates
+def pullUpdate(update, context):
+    os.system('git pull')
 

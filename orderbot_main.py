@@ -8,24 +8,14 @@ import time
 # import ntpath
 import numpy as np
 from bot_commonHandlers import *
-
-# class MenuFilter(MessageFilter):
-#     def __
-    
-#     def filter(message):
+import sqlite3 as sq
         
 
-class OrderBot:
+class OrderBot(CommonBot):
     def __init__(self, API_TOKEN=None):
         if API_TOKEN is None:
-            self.API_TOKEN = os.environ['ORDERBOTTOKEN']
-                
-        else:
-            self.API_TOKEN = API_TOKEN
-            
-        self.updater = Updater(token=self.API_TOKEN, use_context=True)
-        self.dispatcher = self.updater.dispatcher
-        
+            API_TOKEN = os.environ['ORDERBOTTOKEN']
+
         # define menu (2-layer should cover everything?)
         self.menu = {'Kopi': {'Normal', 'Siew Dai', 'Gau', 'Gah Dai', 'Po'},
                      'Kopi-O': {'Normal', 'Siew Dai', 'Gau', 'Kosong', 'Po', 'Kosong Di Lo'},
@@ -54,46 +44,77 @@ class OrderBot:
         # for i in range(1,len(self.unpackedMenu)):
         #     self.filtMenuFine = self.filtMenuFine | Filters.regex(self.unpackedMenu[i])
         # print(self.filtMenuFine)
-        
-        
 
-        
         # dict of unique sessions tied to unique chats
         self.sessions = {}
         
-    
+        # database for payment info
+        db = sq.connect('payment.db') # we can't keep it since the handlers spawn new threads, and the sqlite objects cant be shared safely
+        con = db.cursor()
+        con.execute("create table if not exists userlinks(user int primary key, link text)")
+        db.commit()
+        db.close()
         
-    def run(self):
-        self.dispatcher.add_handler(CommandHandler('status', self.check))
-        self.dispatcher.add_handler(CommandHandler('update', self.updateBot))
+        # base constructor, also calls addHandlers for you
+        super().__init__(token=API_TOKEN)
+          
+    def addHandlers(self): # overloaded
+        super().addHandlers()
         
+        self.dispatcher.add_handler(CommandHandler('paid', self.payMe))
+        self.dispatcher.add_handler(CommandHandler('paymentinfo', self.paymentInfo))
+        # message handlers after command handlers
         self.dispatcher.add_handler(MessageHandler(Filters.regex(r'Drinks?'), self.openOrder))
         self.dispatcher.add_handler(MessageHandler(Filters.regex(r'Order'), self.addToOrder))
         self.dispatcher.add_handler(MessageHandler(Filters.regex(r'Done'), self.closeOrder))
         self.dispatcher.add_handler(MessageHandler(self.filtMenuCoarse, self.editOrder))
         # self.dispatcher.add_handler(MessageHandler(self.filtMenuFine, self.addIceToOrder))
+        print("Added OrderBot handlers.")
         
-        print("Bot initialization complete.")
-        self.updater.start_polling()
-        self.updater.idle()
-
-    def check(self, update, context):
-        status(update, context)
+    def payMe(self, update, context):
+        if not self.checkCommandIsOld(update.message):
+            try:
+                user = update.message.from_user.id
+                
+                db = sq.connect("payment.db")
+                cur = db.cursor()
+                # get the user's link
+                cur.execute("select link from userlinks where user==?", (user,))
+                link = cur.fetchall()[0][0]
+                db.close()
+                
+                context.bot.send_message(chat_id=update.message.chat_id, text='Please pay via: %s' % (link))
+            except:
+                context.bot.send_message(chat_id=update.message.chat_id, text='No current info.\nPlease use /paymentinfo to set it up.')
         
-    def updateBot(self, update, context):
-        pullUpdate(update, context)
-
+    def paymentInfo(self, update, context):
+        if not self.checkCommandIsOld(update.message):
+            try:
+                user = update.message.from_user.id
+                
+                print("User: %d" % user)
+                print("Attempting to insert link: %s" % context.args[0])
+                
+                db = sq.connect("payment.db")
+                cur = db.cursor()
+                # insert/replace this user's link
+                cur.execute("insert or replace into userlinks values(?,?)", (user, context.args[0]))
+                db.commit()
+    
+                cur.execute("select link from userlinks where user==?", (user,))
+                link = cur.fetchall()[0][0]
+                db.close()
+    
+                context.bot.send_message(chat_id=update.message.chat_id, text='Your payment info has been updated to: %s' % (link))
+            
+            except:
+                context.bot.send_message(chat_id=update.message.chat_id, text='Please specify the link after the command.\nFor example, "/paymentinfo https://my.link.com"')
+        
     def openOrder(self, update, context):
         if update.message.chat_id not in self.sessions: self.sessions[update.message.chat_id] = Session(update.message.chat_id) 
         if self.sessions[update.message.chat_id].nowOrdering is False:
             self.sessions[update.message.chat_id].nowOrdering = True
-            
-            # kb = [[InlineKeyboardButton(i, callback_data=i)] for i in list(self.menu.keys())]
-            
-            # kb_markup = InlineKeyboardMarkup(kb)
-            
-            # context.bot.send_message(chat_id=update.message.chat_id, text='Please begin orders by typing "O".',
-            #                          reply_markup=kb_markup)
+
             context.bot.send_message(chat_id=update.message.chat_id, text='Please begin orders by typing "Order".',
                                     reply_markup=ReplyKeyboardRemove())
             

@@ -1,6 +1,6 @@
 while :
 do
-	python seopibot_main.py
+	python orderbot_main.py
 	if [ $? -eq 0 ]; then
 		echo "Exiting."
 		break

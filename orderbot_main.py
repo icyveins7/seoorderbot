@@ -1,6 +1,7 @@
 from telegram.ext import Updater, CommandHandler, MessageHandler, MessageFilter, Filters, CallbackQueryHandler, CallbackContext
 from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import ParseMode
 import datetime as dt
 import re
 import os
@@ -83,7 +84,7 @@ class OrderBot(CommonBot):
                 link = cur.fetchall()[0][0]
                 db.close()
                 
-                context.bot.send_message(chat_id=update.message.chat_id, text='Please pay via: %s' % (link))
+                context.bot.send_message(chat_id=update.message.chat_id, text='Please pay [me](%s).' % link, parse_mode=ParseMode.MARKDOWN_V2)
             except:
                 context.bot.send_message(chat_id=update.message.chat_id, text='No current info.\nPlease use /paymentinfo to set it up.')
         

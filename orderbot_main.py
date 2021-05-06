@@ -76,15 +76,16 @@ class OrderBot(CommonBot):
         if not self.checkCommandIsOld(update.message):
             try:
                 user = update.message.from_user.id
-                
+                username = update.message.from_user.username
+    
                 db = sq.connect("payment.db")
                 cur = db.cursor()
                 # get the user's link
                 cur.execute("select link from userlinks where user==?", (user,))
                 link = cur.fetchall()[0][0]
                 db.close()
-                
-                context.bot.send_message(chat_id=update.message.chat_id, text='Please pay [me](%s).' % link, parse_mode=ParseMode.MARKDOWN_V2)
+    
+                context.bot.send_message(chat_id=update.message.chat_id, text='Please pay [%s](%s)\.' % (username,link), parse_mode=ParseMode.MARKDOWN_V2)
             except:
                 context.bot.send_message(chat_id=update.message.chat_id, text='No current info.\nPlease use /paymentinfo to set it up.')
         

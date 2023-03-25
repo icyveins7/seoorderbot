@@ -1,3 +1,5 @@
+### This script only runs with the old python-telegram-bot package, and no longer works. It is deprecated and will be removed in a future version.
+
 from telegram.ext import Updater, CommandHandler, MessageHandler, MessageFilter, Filters, CallbackQueryHandler, CallbackContext
 from telegram import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
@@ -10,6 +12,7 @@ import time
 import numpy as np
 from bot_commonHandlers import *
 import sqlite3 as sq
+import sys
         
 
 class OrderBot(CommonBot):
@@ -188,11 +191,16 @@ class Session:
         self.nowOrdering = False # ordering status
         print('Session created for chat ',chat_id)
 
+
+#%%
 if __name__ == '__main__':
-    try:
-        with open("token.txt") as f:
-            TOKEN = f.read()
-        bot = OrderBot(TOKEN)
-    except:
-        bot = OrderBot()
+    bot = OrderBot(sys.argv[1])
     bot.run()
+
+    # try:
+    #     with open("token.txt") as f:
+    #         TOKEN = f.read()
+    #     bot = OrderBot(TOKEN)
+    # except:
+    #     bot = OrderBot()
+    # bot.run()

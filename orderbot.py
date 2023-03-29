@@ -44,6 +44,8 @@ class OrderInterface:
         self.activeGroup = dict() # Lookup for user->current group
         self._chatids = dict() # Lookup for user->chatid
 
+        self._adminfilter = None
+
     def _addInterfaceHandlers(self):
         super()._addInterfaceHandlers()
         print("Adding OrderInterface:help")
@@ -84,6 +86,13 @@ class OrderInterface:
             self.close,
             filters=self.ufilts
         ))
+        # Admin only handlers
+        print("Adding OrderInterface:reset")
+        self._app.add_handler(CommandHandler(
+            "reset",
+            self.reset,
+            filters=self.ufilts & self._adminfilter
+        ))
 
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         helpstr = "Start a group order with /start. The person who starts the order will be the leader," \
@@ -111,14 +120,14 @@ class OrderInterface:
 
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="Starting a new group order.. Tell your friends to /join %d! Add your own order with /order." % (update.effective_chat.id)
+                text="Starting a new group order.. Tell your friends to '/join %d'! Add your own order with /order." % (update.effective_chat.id)
             )
         
         # Otherwise tell them the order already exists
         else:
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="You already have an active order! Tell your friends to /join %d! Add your own order with /order." % (update.effective_chat.id)
+                text="You already have an active order! Tell your friends to '/join %d'! Add your own order with /order." % (update.effective_chat.id)
             )
 
     def _createOrderGroup(self, groupid):
@@ -380,6 +389,25 @@ class OrderInterface:
         # Then pop the group itself from orders dictd
         self.orders.pop(groupid, None)
 
+    #%% Admin commands
+    def _reset(self):
+        """
+        Clears the orders dictionary and the active group dictionary.
+        """
+        self.activeGroup.clear()
+        self.orders.clear()
+
+    async def reset(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        self._reset()
+
+        print(self.activeGroup)
+        print(self.orders)
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="All orders and active groups have been reset."
+        )
+
 
 class OrderBot(OrderInterface, cbi.StatusInterface, cbi.BotContainer):
     pass
@@ -388,4 +416,5 @@ class OrderBot(OrderInterface, cbi.StatusInterface, cbi.BotContainer):
 #%%
 if __name__ == "__main__":
     bot = OrderBot.fromTokenString(sys.argv[1])
+    bot._adminfilter = cbi.AdminFilter(int(sys.argv[2]))
     bot.run()

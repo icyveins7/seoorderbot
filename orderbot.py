@@ -381,7 +381,7 @@ class OrderInterface:
         self.orders.pop(groupid, None)
 
 
-class OrderBot(OrderInterface, cbi.ControlInterface, cbi.StatusInterface, cbi.BotContainer):
+class OrderBot(OrderInterface, cbi.StatusInterface, cbi.BotContainer):
     pass
 
 

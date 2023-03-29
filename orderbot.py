@@ -7,6 +7,7 @@ join - Joins a group order. E.g. /join 123456789.
 order - Adds a drink to the group order.
 cancel - Cancels one of your individual drinks.
 close - Closes a group order.
+current - Displays the current group order.
 """
 
 
@@ -82,6 +83,12 @@ class OrderInterface:
         self._app.add_handler(CommandHandler(
             "close",
             self.close,
+            filters=self.ufilts
+        ))
+        print("Adding OrderInterface:current")
+        self._app.add_handler(CommandHandler(
+            "current",
+            self.current,
             filters=self.ufilts
         ))
         # Admin only handlers
@@ -386,6 +393,19 @@ class OrderInterface:
 
         # Then pop the group itself from orders dictd
         self.orders.pop(groupid, None)
+
+    ###########################################
+    async def current(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # Display orders for the user's active group with a message
+        userid = update.effective_user.id
+        activeGroup = self.activeGroup[userid]
+        grouporders = self.orders[activeGroup]
+        collated, _ = self._collate(grouporders)
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=collated
+        )
 
     #%% Admin commands
     def _reset(self):

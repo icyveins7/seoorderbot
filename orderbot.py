@@ -44,8 +44,6 @@ class OrderInterface:
         self.activeGroup = dict() # Lookup for user->current group
         self._chatids = dict() # Lookup for user->chatid
 
-        self._adminfilter = None
-
     def _addInterfaceHandlers(self):
         super()._addInterfaceHandlers()
         print("Adding OrderInterface:help")
@@ -91,7 +89,7 @@ class OrderInterface:
         self._app.add_handler(CommandHandler(
             "reset",
             self.reset,
-            filters=self.ufilts & self._adminfilter
+            filters=self.ufilts & self._adminfilter # Note that this assumes AdminInterface
         ))
 
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -409,12 +407,13 @@ class OrderInterface:
         )
 
 
-class OrderBot(OrderInterface, cbi.StatusInterface, cbi.BotContainer):
+# Note that OrderInterface must be the first inheritance
+class OrderBot(OrderInterface, cbi.AdminInterface, cbi.StatusInterface, cbi.BotContainer):
     pass
 
 
 #%%
 if __name__ == "__main__":
     bot = OrderBot.fromTokenString(sys.argv[1])
-    bot._adminfilter = cbi.AdminFilter(int(sys.argv[2]))
+    bot.setAdmin(int(sys.argv[2]))
     bot.run()

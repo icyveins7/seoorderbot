@@ -8,6 +8,7 @@ order - Adds a drink to the group order.
 cancel - Cancels one of your individual drinks.
 close - Closes a group order.
 current - Displays the current group order.
+announce - Toggles announcements in the current group chat.
 """
 
 
@@ -131,7 +132,7 @@ class OrderInterface:
             "The leader will have an ID that they can share to the other group members, which should be placed after the /join command. Use '/join 24838501' for example. \n\n" \
             "Members can then add drinks to the order with /order. To cancel drinks, use /cancel.\n\n" \
             "When everyone is done with the order, the leader can /close the order to collate the drinks.\n\n" \
-            "In your group chat, you can use /announce to post updates to the group when you start a new group order."
+            "In your group chat, you can use /announce to post updates to the group when you start a new group order. If you'd like to toggle this off, simply /announce again."
 
         await context.bot.send_message(
             chat_id=update.effective_chat.id,

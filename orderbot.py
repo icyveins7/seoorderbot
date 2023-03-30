@@ -44,6 +44,7 @@ class OrderInterface:
         self.orders = dict() # Lookup for group->user->list of orders
         self.activeGroup = dict() # Lookup for user->current group
         self._chatids = dict() # Lookup for user->chatid
+        self._announcements = dict() # Lookup for group/userleader->chatid
 
         self._timeout = 3600 # Default timeout in seconds
 
@@ -59,19 +60,19 @@ class OrderInterface:
         self._app.add_handler(CommandHandler(
             "start",
             self.start,
-            filters=self.ufilts
+            filters=self.ufilts & cbi.PrivateOnlyChatFilter()
         ))
         print("Adding OrderInterface:join")
         self._app.add_handler(CommandHandler(
             "join",
             self.join,
-            filters=self.ufilts
+            filters=self.ufilts & cbi.PrivateOnlyChatFilter()
         ))
         print("Adding OrderInterface:order")
         self._app.add_handler(CommandHandler(
             "order",
             self.order,
-            filters=self.ufilts
+            filters=self.ufilts & cbi.PrivateOnlyChatFilter()
         ))
         print("Adding OrderInterface:button")
         self._app.add_handler(CallbackQueryHandler(self.button))
@@ -79,19 +80,25 @@ class OrderInterface:
         self._app.add_handler(CommandHandler(
             "cancel",
             self.cancel,
-            filters=self.ufilts
+            filters=self.ufilts & cbi.PrivateOnlyChatFilter()
         ))
         print("Adding OrderInterface:close")
         self._app.add_handler(CommandHandler(
             "close",
             self.close,
-            filters=self.ufilts
+            filters=self.ufilts & cbi.PrivateOnlyChatFilter()
         ))
         print("Adding OrderInterface:current")
         self._app.add_handler(CommandHandler(
             "current",
             self.current,
-            filters=self.ufilts
+            filters=self.ufilts & cbi.PrivateOnlyChatFilter()
+        ))
+        print("Adding OrderInterface:announce")
+        self._app.add_handler(CommandHandler(
+            "announce",
+            self.announce,
+            filters=self.ufilts & cbi.GroupOnlyChatFilter()
         ))
         # Admin only handlers
         print("Adding OrderInterface:reset")
@@ -416,6 +423,16 @@ class OrderInterface:
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=collated
+        )
+
+    ###########################################
+    async def announce(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # Set the chat id to announce the group order to
+        self._announcements[update.effective_user.id] = update.effective_chat.id
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text="Okay %s, I'll announce here if you start a new group order." % (update.effective_user.first_name)
         )
 
     ################## Admin commands ##################

@@ -45,6 +45,8 @@ class OrderInterface:
         self.activeGroup = dict() # Lookup for user->current group
         self._chatids = dict() # Lookup for user->chatid
 
+        self._timeout = 3600 # Default timeout in seconds
+
     def _addInterfaceHandlers(self):
         super()._addInterfaceHandlers()
         print("Adding OrderInterface:help")
@@ -98,6 +100,13 @@ class OrderInterface:
             self.reset,
             filters=self.ufilts & self._adminfilter # Note that this assumes AdminInterface
         ))
+        print("Adding OrderInterface:setTimeout")
+        self._app.add_handler(CommandHandler(
+            "timeout",
+            self.setTimeout,
+            filters=self.ufilts & self._adminfilter # Note that this assumes AdminInterface
+        ))
+        
 
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         helpstr = "Start a group order with /start. The person who starts the order will be the leader," \
@@ -117,6 +126,8 @@ class OrderInterface:
         if update.effective_user.id not in self.orders:
             # Create the group order
             self._createOrderGroup(update.effective_user.id)
+            # Set a timeout job
+            context.job_queue.run_once(self.timeoutGroupOrder, self._timeout, data=update.effective_user.id)
             # Also join it yourself
             await self._joinOrderGroup(update, context, update.effective_user.id, update.effective_user.id, alsoSendMessage=False)
             
@@ -391,7 +402,7 @@ class OrderInterface:
         for userid in self.orders[groupid]:
             self.activeGroup.pop(userid, None)
 
-        # Then pop the group itself from orders dictd
+        # Then pop the group itself from orders dict
         self.orders.pop(groupid, None)
 
     ###########################################
@@ -407,7 +418,7 @@ class OrderInterface:
             text=collated
         )
 
-    #%% Admin commands
+    ################## Admin commands ##################
     def _reset(self):
         """
         Clears the orders dictionary and the active group dictionary.
@@ -425,6 +436,34 @@ class OrderInterface:
             chat_id=update.effective_chat.id,
             text="All orders and active groups have been reset."
         )
+
+    async def setTimeout(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Command to either view current timeout or set a new timeout.
+        """
+        if len(context.args) == 0:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Timeout is currently set to %d seconds." % (self._timeout)
+            )
+            return
+
+        # Set a new timeout
+        self._timeout = int(context.args[0])
+
+        await context.bot.send_message(
+            chat_id=update.effective_chat.id,
+            text=f"Timeout set to {self._timeout} seconds."
+        )
+
+    async def timeoutGroupOrder(self, context: ContextTypes.DEFAULT_TYPE):
+        """
+        Job to timeout the active group order.
+        """
+        job = context.job
+        self._closeOrderGroup(job.data)
+
+        print("Timed out the active group order %d..." % (job.data))
 
 
 # Note that OrderInterface must be the first inheritance

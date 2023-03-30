@@ -16,6 +16,7 @@ import common_bot_interfaces as cbi
 from telegram.ext import CommandHandler, ContextTypes, CallbackQueryHandler
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 import sys
+import pickle
 
 #%%
 class OrderInterface:
@@ -44,9 +45,16 @@ class OrderInterface:
         self.orders = dict() # Lookup for group->user->list of orders
         self.activeGroup = dict() # Lookup for user->current group
         self._chatids = dict() # Lookup for user->chatid
-        self._announcements = dict() # Lookup for group/userleader->chatid
 
-        self._timeout = 3600 # Default timeout in seconds
+        # Try to load announcements
+        try:
+            self._loadAnnouncements()
+            print(self._announcements)
+        except Exception as e:
+            print("Couldn't load announcements, defaulting to blank dict: %s" % str(e))
+            self._announcements = dict() # Lookup for group/userleader->chatid
+
+        self._timeout = 1800 # Default timeout in seconds
 
     def _addInterfaceHandlers(self):
         super()._addInterfaceHandlers()
@@ -115,19 +123,22 @@ class OrderInterface:
         ))
         
 
+    ###########################################
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         helpstr = "Start a group order with /start. The person who starts the order will be the leader," \
             " and is responsible for closing the order with /close at the end.\n\n" \
             "Other members of the group can join with /join. " \
             "The leader will have an ID that they can share to the other group members, which should be placed after the /join command. Use '/join 24838501' for example. \n\n" \
             "Members can then add drinks to the order with /order. To cancel drinks, use /cancel.\n\n" \
-            "When everyone is done with the order, the leader can /close the order to collate the drinks."
+            "When everyone is done with the order, the leader can /close the order to collate the drinks.\n\n" \
+            "In your group chat, you can use /announce to post updates to the group when you start a new group order."
 
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
             text=helpstr
         )
 
+    ###########################################
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         # Add to the order list if not already there
         if update.effective_user.id not in self.orders:
@@ -145,6 +156,13 @@ class OrderInterface:
                 chat_id=update.effective_chat.id,
                 text="Starting a new group order.. Tell your friends to '/join %d'! Add your own order with /order." % (update.effective_chat.id)
             )
+
+            # Announce if it's been configured by this user
+            if update.effective_user.id in self._announcements:
+                await context.bot.send_message(
+                    chat_id=self._announcements[update.effective_user.id],
+                    text="%s just started a new group order; open a chat with me and '/join %d'!" % (update.effective_user.first_name, update.effective_chat.id)
+                )
         
         # Otherwise tell them the order already exists
         else:
@@ -420,20 +438,46 @@ class OrderInterface:
         grouporders = self.orders[activeGroup]
         collated, _ = self._collate(grouporders)
 
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text=collated
-        )
+        if len(collated) > 0:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text=collated
+            )
+        else:
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="There are no drink orders yet in this group."
+            )
 
     ###########################################
     async def announce(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Set the chat id to announce the group order to
-        self._announcements[update.effective_user.id] = update.effective_chat.id
+        # Toggle the announcements
+        if update.effective_user.id in self._announcements:
+            self._announcements.pop(update.effective_user.id)
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Okay %s, I've turned off your announcements in this group." % (update.effective_user.first_name)
+            )
 
-        await context.bot.send_message(
-            chat_id=update.effective_chat.id,
-            text="Okay %s, I'll announce here if you start a new group order." % (update.effective_user.first_name)
-        )
+        else:
+            # Set the chat id to announce the group order to
+            self._announcements[update.effective_user.id] = update.effective_chat.id
+
+            await context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Okay %s, I'll announce here if you start a new group order." % (update.effective_user.first_name)
+            )
+
+        # Save the announcements
+        self._saveAnnouncements()
+
+    def _saveAnnouncements(self):
+        with open('announcements.pkl', 'wb') as fp:
+            pickle.dump(self._announcements, fp)
+
+    def _loadAnnouncements(self):
+        with open('announcements.pkl', 'rb') as fp:
+            self._announcements = pickle.load(fp)
 
     ################## Admin commands ##################
     def _reset(self):

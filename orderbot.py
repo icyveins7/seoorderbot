@@ -132,7 +132,7 @@ class OrderInterface:
             "The leader will have an ID that they can share to the other group members, which should be placed after the /join command. Use '/join 24838501' for example. \n\n" \
             "Members can then add drinks to the order with /order. To cancel drinks, use /cancel.\n\n" \
             "When everyone is done with the order, the leader can /close the order to collate the drinks.\n\n" \
-            "In your group chat, you can use /announce to post updates to the group when you start a new group order. If you'd like to toggle this off, simply /announce again."
+            "In your group chat, you can use /announce to post updates to the group when you start or close a new group order. If you'd like to toggle this off, simply /announce again."
 
         await context.bot.send_message(
             chat_id=update.effective_chat.id,
@@ -396,6 +396,13 @@ class OrderInterface:
                 )
             )
 
+        # Also send to the announcement group if it is set
+        if update.effective_user.id in self._announcements:
+            await context.bot.send_message(
+                chat_id=self._announcements[update.effective_user.id],
+                text="%s has closed the group order!\n%s" % (update.effective_user.first_name, collated)
+            )
+
 
     def _collate(self, orders: dict):
         """
@@ -452,21 +459,22 @@ class OrderInterface:
 
     ###########################################
     async def announce(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        # Toggle the announcements
-        if update.effective_user.id in self._announcements:
+        # Turn off the announcements if the current group is currently set for announcements for this user
+        if update.effective_user.id in self._announcements and self._announcements[update.effective_user.id] == update.effective_chat.id:
             self._announcements.pop(update.effective_user.id)
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
                 text="Okay %s, I've turned off your announcements in this group." % (update.effective_user.first_name)
             )
 
+        # Otherwise if it's currently set to another group, or no group yet, then
         else:
             # Set the chat id to announce the group order to
             self._announcements[update.effective_user.id] = update.effective_chat.id
 
             await context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text="Okay %s, I'll announce here if you start a new group order." % (update.effective_user.first_name)
+                text="Okay %s, I'll announce here if you start or close a group order." % (update.effective_user.first_name)
             )
 
         # Save the announcements

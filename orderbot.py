@@ -38,6 +38,7 @@ class OrderInterface:
     configureDrink = ["Iced", "No Ice", "Hot"] # Generic configurations of drinks which apply to everything, last step of the order
     configureSymbol = "!" # We use this symbol in the callback data to identify the configure menu, which is the end of the order
     cancelSymbol = "@" # We use this symbol in the callback data to identify the cancel menu
+    lastOrderSymbol = "^" # We use this symbol in the callback data to identify the last order menu
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -54,6 +55,14 @@ class OrderInterface:
         except Exception as e:
             print("Couldn't load announcements, defaulting to blank dict: %s" % str(e))
             self._announcements = dict() # Lookup for group/userleader->chatid
+
+        # Try to load saved previous orders
+        try:
+            self._loadLastOrders()
+            print(self._lastOrders)
+        except Exception as e:
+            print("Couldn't load orders, defaulting to blank dict: %s" % str(e))
+            self._lastOrders = dict() # Lookup for user->last order string
 
         self._timeout = 1800 # Default timeout in seconds
 
@@ -237,17 +246,38 @@ class OrderInterface:
                 text="You are not in a group! Join a group first with /join or start a group with /start."
             )
             return
+        
+        # Check if the user has a last order saved
+        if update.effective_user.id in self._lastOrders:
+            # Get the last order
+            lastorder = self._lastOrders[update.effective_user.id]
 
-        reply_markup = self._generateKeyboard()
+            await update.message.reply_text(
+                "Your last order was %s, do you want it again?" % (lastorder),
+                reply_markup=InlineKeyboardMarkup(
+                    [
+                        [InlineKeyboardButton("Yes", callback_data=self.lastOrderSymbol+"Yes"),
+                         InlineKeyboardButton("No", callback_data=self.lastOrderSymbol+"No")]
+                    ]
+                )
+            )
 
-        await update.message.reply_text(
-            "What would you like to order?",
-            reply_markup=reply_markup
-        )
+        # Otherwise by default just present the menu
+        else:
+            reply_markup = self._generateKeyboard()
+
+            await update.message.reply_text(
+                "What would you like to order?",
+                reply_markup=reply_markup
+            )
 
     def _generateKeyboard(self, key: str=None, subkey: str=None):
         """
         Internal method to generate the keyboard for the order interface.
+
+        1. If no key or subkey is supplied, generate from the top-level menu
+        2. If a key is supplied, generate from the submenu
+        3. If a key and subkey is supplied, generate from the configuration menu
         """
         keyboard = []
 
@@ -291,6 +321,12 @@ class OrderInterface:
     
     def _prettifyOrderString(self, querydata: str):
         return querydata.replace(self.submenuSymbol, " ").replace(self.configureSymbol, ", ")
+    
+    def _addToOrder(self, userid: int, order: str):
+        activeGroup = self.activeGroup[userid]
+        self.orders[activeGroup][userid].append(order)
+        # Also update the last order
+        self._updateLastOrder(userid, order)
 
     async def button(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """Parses the CallbackQuery and updates the message text."""
@@ -300,8 +336,26 @@ class OrderInterface:
         # Some clients may have trouble otherwise. See https://core.telegram.org/bots/api#callbackquery
         await query.answer()
 
+        # Did we have a last order?
+        if self.lastOrderSymbol in query.data:
+            # If yes, retrieve the user's last order
+            if "Yes" in query.data:
+                lastorder = self._lastOrders[update.effective_user.id]
+                # Add to the order directly
+                self._addToOrder(update.effective_user.id, lastorder)
+                print(self.orders)
+
+                await query.edit_message_text(text=f"{lastorder} has been added!")
+
+            # Otherwise we start the menu again
+            else:
+                reply_markup = self._generateKeyboard()
+
+                await query.edit_message_text(text="What would you like to order?", reply_markup=reply_markup)
+                
+
         # Are we at the joining groups menu?
-        if self.groupSymbol in query.data:
+        elif self.groupSymbol in query.data:
             groupid = int(query.data[1:])
             userid = update.effective_user.id
             if userid not in self.orders[groupid]:
@@ -326,10 +380,7 @@ class OrderInterface:
         # Are we at the configure menu?
         elif self.configureSymbol in query.data:
             # Complete the order
-            activeGroup = self.activeGroup[update.effective_user.id]
-            self.orders[activeGroup][update.effective_user.id].append(
-                self._prettifyOrderString(query.data)
-            )
+            self._addToOrder(update.effective_user.id, self._prettifyOrderString(query.data))
             print(self.orders)
 
             await query.edit_message_text(text=f"{self._prettifyOrderString(query.data)} has been added!")
@@ -487,6 +538,20 @@ class OrderInterface:
     def _loadAnnouncements(self):
         with open('announcements.pkl', 'rb') as fp:
             self._announcements = pickle.load(fp)
+
+    ###########################################
+    def _updateLastOrder(self, userid: int, order: str):
+        self._lastOrders[userid] = order
+        # Save it
+        self._saveLastOrders()
+
+    def _saveLastOrders(self):
+        with open('lastorders.pkl', 'wb') as fp:
+            pickle.dump(self._lastOrders, fp)
+
+    def _loadLastOrders(self):
+        with open('lastorders.pkl', 'rb') as fp:
+            self._lastOrders = pickle.load(fp)
 
     ################## Admin commands ##################
     def _reset(self):

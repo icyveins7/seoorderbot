@@ -482,12 +482,14 @@ class OrderInterface:
         return collated, members
     
     def _closeOrderGroup(self, groupid):
-        # Pop the active group for each of the users in the group
-        for userid in self.orders[groupid]:
-            self.activeGroup.pop(userid, None)
+        # Check if groupid is still in the dict (this would get called by the job but may have been closed by the user already)
+        if groupid in self.orders:
+            # Pop the active group for each of the users in the group
+            for userid in self.orders[groupid]:
+                self.activeGroup.pop(userid, None)
 
-        # Then pop the group itself from orders dict
-        self.orders.pop(groupid, None)
+            # Then pop the group itself from orders dict
+            self.orders.pop(groupid, None)
 
     ###########################################
     async def current(self, update: Update, context: ContextTypes.DEFAULT_TYPE):

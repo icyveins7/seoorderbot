@@ -604,7 +604,7 @@ class OrderInterface:
 
 
 # Note that OrderInterface must be the first inheritance
-class OrderBot(OrderInterface, cbi.AdminInterface, cbi.StatusInterface, cbi.BotContainer):
+class OrderBot(OrderInterface, cbi.GitInterface, cbi.ControlInterface, cbi.StatusInterface, cbi.BotContainer):
     pass
 
 

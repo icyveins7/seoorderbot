@@ -432,18 +432,15 @@ class OrderInterface:
         # Collate the orders
         collated, members = self._collate(self.orders[update.effective_user.id])
 
-        # Then close the order
-        self._closeOrderGroup(update.effective_user.id)
-
-        print(self.orders)
-        print(self.activeGroup)
-
         # We send the closing message to every user in the group
         for member in members:
+            # Generate user-specific collation
+            usercollated, _ = self._collate(self.orders[update.effective_user.id], member)
+
             await context.bot.send_message(
                 chat_id=self._chatids[member],
                 text="Closing this group order...\n%s" % (
-                    collated
+                    usercollated
                 )
             )
 
@@ -454,13 +451,20 @@ class OrderInterface:
                 text="%s has closed the group order!\n%s" % (update.effective_user.first_name, collated)
             )
 
+        # Then close the order
+        self._closeOrderGroup(update.effective_user.id)
 
-    def _collate(self, orders: dict):
+        print(self.orders)
+        print(self.activeGroup)
+
+
+    def _collate(self, orders: dict, user: int=None):
         """
         Counts the unique drinks in the group order and returns the string to send to the users.
         Also returns a list of the users who are in the group, to be used to reference their chat ids later.
         """
         counter = dict()
+        usercounter = dict()
         members = []
         # Iterate over every member
         for member, drinks in orders.items():
@@ -474,10 +478,22 @@ class OrderInterface:
                 else: 
                     counter[drink] += 1
 
+                # If a user is specified, add it to his/her counters
+                if user is not None and member == user:
+                    if drink not in usercounter:
+                        usercounter[drink] = 1
+                    else:
+                        usercounter[drink] += 1
+
         # Now make a nice long string for every unique drink
         collated = ""
         for drink, count in counter.items():
-            collated += "%3dx %s\n" % (count, drink)
+            usercheck = ""
+            if user is not None:
+                # Attach the string from usercounter
+                usercheck = " (You: x%d)" % (usercounter[drink])
+            
+            collated += "%3dx %s%s\n" % (count, drink, usercheck)
         
         return collated, members
     
@@ -497,7 +513,7 @@ class OrderInterface:
         userid = update.effective_user.id
         activeGroup = self.activeGroup[userid]
         grouporders = self.orders[activeGroup]
-        collated, _ = self._collate(grouporders)
+        collated, _ = self._collate(grouporders, userid)
 
         if len(collated) > 0:
             await context.bot.send_message(

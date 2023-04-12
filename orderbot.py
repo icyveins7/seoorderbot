@@ -489,7 +489,7 @@ class OrderInterface:
         collated = ""
         for drink, count in counter.items():
             usercheck = ""
-            if user is not None:
+            if user is not None and drink in usercounter:
                 # Attach the string from usercounter
                 usercheck = " (You: x%d)" % (usercounter[drink])
             
